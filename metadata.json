@@ -1,0 +1,8 @@
+{
+  "name": "SnapLearn",
+  "description": "Your AI yaar for science and learning. Snap, ask, and learn with interactive experiments and expert guidance.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
