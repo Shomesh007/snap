@@ -1,39 +1,25 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Info, Search, Star, Clock, Play, BookOpen, Hammer, Rocket, Trophy, User } from 'lucide-react';
 
+import { AppState } from '../store/appStore';
+
 interface Props {
   onBack: () => void;
-  onSelect: () => void;
+  onSelect: (concept: string) => void;  // passes concept directly to App
+  appState: AppState;
+  setAppState: (s: AppState) => void;
 }
 
 const experiments = [
-  {
-    id: '1',
-    title: 'Invisible Ink Secret',
-    difficulty: 'EASY',
-    time: '15 min',
-    rating: 2,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD9LBhN0QTciPYAgajsmPx56LTRi-TAWy6KI2kWLUc8lnRts-4CXbxcrF2lsylUhhF29cqSBoH9UXqAnh90rlPVW149J0rU-7KoEV9vN8OSkMZTYOgLZuZKgLfAjkeLLMM0VZnYStXOVz5Fx0cc1SIrQt6hKhj5wrrMYWyla6uC0fd2vwcZZVcL8inPlxGmykCDJRXjBcrfRyw3DUenu2NOnFFHoLG2D47VGQmICt3euDe_9vu2eV05tJ36TbdLSPpPw9S8--WNb_RS'
-  },
-  {
-    id: '2',
-    title: 'Lemon Battery Hack',
-    difficulty: 'MEDIUM',
-    time: '30 min',
-    rating: 3,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuASMMWygzRmj1r5Uc_avRK5wCpS60qqx9sZRu8qspoSsUk0nly2GHcRJnqFZgbBCPaBPZNSSMuqTZK0E0aAQXL_gt9Q6ZM7EfH94I6AGmL8TZy_VG_1ySYDwgDDMvVF6syYQfJsORPEoYDcTPyOdthd5ongJOmT2z9kZeozarWtM2b032hlOFdMFU2EFmRerPo5fp-CPJ47xek1FEBgOeKAGQLj2yoWmmLmAVyWtchWGhXkEh2EcahNvoHMNb7jRtUE7mDSgST70elA'
-  },
-  {
-    id: '3',
-    title: 'Kitchen Volcano',
-    difficulty: 'PRO',
-    time: '45 min',
-    rating: 3,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuABJsRcTPHJStGyIYVO_Lmb9hnJJ6EsXxf8y0q1tWrWdOF0KAXyFXzLsKdiaeZ_aRh5Wx2bQ8kVNJDnfFInVTCpasQHfrV7VMVtNSS7-nJnWr5SQtJcg3Ha4E8SqIoIHwM_3gD0Lbe4tE5ldRIQwb0hGHlJfWKz7Se63mn6lSCdzbc_Nwb1VSpBSqqqN5sVgpwOwFLqSBkVz-JhoSuTjLlBa_FU5teO_R_eVQwORSsnoD7__xgOHJvu64EYobTdE4vUMkGafmy1-sw0'
-  }
+  { id: '1', title: 'pH Indicator Test', concept: 'Acids, Bases and Salts', difficulty: 'EASY', time: '8 min', rating: 3, emoji: '🧪', subject: 'Chemistry' },
+  { id: '2', title: 'Invisible Ink Secret', concept: 'Chemical Reactions & Heating', difficulty: 'EASY', time: '15 min', rating: 2, emoji: '✍️', subject: 'Chemistry' },
+  { id: '3', title: 'Lemon Battery Hack', concept: 'Electric Cells & Current', difficulty: 'MEDIUM', time: '30 min', rating: 3, emoji: '⚡', subject: 'Physics' },
+  { id: '4', title: 'Kitchen Volcano', concept: 'Acid-Base Reactions & CO2', difficulty: 'EASY', time: '10 min', rating: 3, emoji: '🌋', subject: 'Chemistry' },
+  { id: '5', title: 'Densità Tower', concept: 'Density & Immiscibility', difficulty: 'EASY', time: '12 min', rating: 3, emoji: '🏗️', subject: 'Physics' },
+  { id: '6', title: 'Homemade Compass', concept: 'Magnetic Field & Direction', difficulty: 'MEDIUM', time: '20 min', rating: 2, emoji: '🧭', subject: 'Physics' },
 ];
 
-export default function DIYPickerScreen({ onBack, onSelect }: Props) {
+export default function DIYPickerScreen({ onBack, onSelect, appState, setAppState }: Props) {
   const [selectedExp, setSelectedExp] = useState<any>(null);
 
   return (
@@ -52,10 +38,10 @@ export default function DIYPickerScreen({ onBack, onSelect }: Props) {
           <h2 className="text-2xl font-bold text-white">Ghar pe real experiments karo!</h2>
           <p className="text-slate-400 text-sm">Turn your kitchen into a science lab 🚀</p>
         </div>
-        
+
         <div className="relative mb-4">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-primary w-5 h-5" />
-          <input 
+          <input
             type="text"
             placeholder="Search experiments..."
             className="w-full bg-primary/10 border-none rounded-xl py-3 pl-12 pr-4 focus:ring-2 focus:ring-primary text-white placeholder:text-slate-500"
@@ -70,21 +56,20 @@ export default function DIYPickerScreen({ onBack, onSelect }: Props) {
         </div>
       </header>
 
-      <main className="flex-1 px-4 py-4 overflow-y-auto no-scrollbar">
-        <div className="grid grid-cols-2 gap-4">
+      <main className="flex-1 px-4 py-4 overflow-y-auto">
+        <div className="grid grid-cols-2 gap-4 pb-8">
           {experiments.map((exp) => (
             <button
               key={exp.id}
               onClick={() => setSelectedExp(exp)}
-              className="bg-primary/10 rounded-xl p-3 border border-primary/20 relative overflow-hidden group text-left"
+              className="bg-white/5 rounded-2xl px-4 pt-5 pb-4 border border-white/10 relative overflow-hidden text-left hover:bg-white/8 transition-colors"
             >
-              <div className="aspect-square rounded-lg mb-3 overflow-hidden bg-slate-800">
-                <img src={exp.image} alt={exp.title} className="w-full h-full object-cover" />
+              <div className="text-4xl mb-3">{exp.emoji}</div>
+              <div className="flex items-center gap-1 mb-2">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${exp.difficulty === 'EASY' ? 'bg-primary/20 text-primary' : 'bg-yellow-400/20 text-yellow-400'}`}>{exp.difficulty}</span>
+                <span className="text-[10px] text-slate-400">• {exp.subject}</span>
               </div>
-              <div className="flex items-center gap-1 mb-1">
-                <span className="text-[10px] font-bold text-primary bg-primary/20 px-2 py-0.5 rounded uppercase">{exp.difficulty}</span>
-              </div>
-              <h3 className="font-bold text-sm mb-1 leading-tight">{exp.title}</h3>
+              <h3 className="font-display font-bold text-sm mb-1 leading-tight text-white">{exp.title}</h3>
               <div className="flex items-center justify-between">
                 <div className="flex text-yellow-500">
                   {Array.from({ length: 3 }).map((_, i) => (
@@ -99,8 +84,8 @@ export default function DIYPickerScreen({ onBack, onSelect }: Props) {
       </main>
 
       {selectedExp && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-background-dark w-full max-w-md rounded-t-lg sm:rounded-lg overflow-hidden shadow-2xl border-t border-primary/30">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-background-dark w-full max-w-md rounded-t-lg sm:rounded-lg overflow-y-auto max-h-[90vh] shadow-2xl border-t border-primary/30">
             <div className="relative h-48">
               <img src={selectedExp.image} alt={selectedExp.title} className="w-full h-full object-cover" />
               <button onClick={() => setSelectedExp(null)} className="absolute top-4 right-4 bg-black/40 text-white rounded-full p-1 backdrop-blur-md">
@@ -147,8 +132,11 @@ export default function DIYPickerScreen({ onBack, onSelect }: Props) {
               <p className="text-slate-400 text-sm mb-6 leading-relaxed">
                 Ever wanted to see a mountain blow up? Is experiment mein hum seekhenge chemical reactions ke baare mein using simple kitchen items like baking soda and vinegar!
               </p>
-              <button 
-                onClick={onSelect}
+              <button
+                onClick={() => {
+                  setAppState({ ...appState, diyExperiment: null });
+                  onSelect(selectedExp?.concept || 'Science experiment');
+                }}
                 className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 text-lg shadow-xl shadow-primary/20"
               >
                 Shuru Karo!

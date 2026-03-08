@@ -1,136 +1,184 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ArrowLeft, HelpCircle, Sun, Beaker, PlusCircle, Home, Microscope, Trophy, User, Sparkles } from 'lucide-react';
+import { ArrowLeft, Sparkles, Camera } from 'lucide-react';
+import { AppState } from '../store/appStore';
+import { scanEnvironmentForDIY } from '../services/snaplearnAI';
+import { motion } from 'motion/react';
 
 interface Props {
   onBack: () => void;
   onStart: () => void;
+  profile: AppState['profile'];
+  concept: string;              // received directly from DIYPickerScreen via App
+  appState: AppState;
+  setAppState: (s: AppState) => void;
 }
 
-export default function DIYScanScreen({ onBack, onStart }: Props) {
+export default function DIYScanScreen({ onBack, onStart, profile, concept, appState, setAppState }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [hasCameraError, setHasCameraError] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   useEffect(() => {
+    let s: MediaStream | null = null;
     async function startCamera() {
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        setHasCameraError(true);
+        return;
+      }
       try {
-        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        setStream(s);
-        if (videoRef.current) {
-          videoRef.current.srcObject = s;
-        }
-      } catch (err) {
-        console.error("Error accessing camera:", err);
+        s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+        if (videoRef.current) videoRef.current.srcObject = s;
+      } catch {
+        setHasCameraError(true);
       }
     }
     startCamera();
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+    return () => { s?.getTracks().forEach(t => t.stop()); };
+  }, []);
+
+  const captureAndScan = async () => {
+    let imageDataUrl: string | null = null;
+
+    if (!hasCameraError && videoRef.current && canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) {
+        canvasRef.current.width = videoRef.current.videoWidth || 640;
+        canvasRef.current.height = videoRef.current.videoHeight || 480;
+        ctx.drawImage(videoRef.current, 0, 0);
+        imageDataUrl = canvasRef.current.toDataURL('image/jpeg', 0.75);
+      }
+    }
+
+    if (!imageDataUrl) return;
+
+    setIsScanning(true);
+    setScanError(null);
+
+    try {
+      const result = await scanEnvironmentForDIY(imageDataUrl, concept, profile);
+      setAppState({ ...appState, diyExperiment: result });
+      onStart();
+    } catch {
+      setScanError('Yaar, photo clearly nahi aaya! Try again karo. 📷');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      if (!evt.target?.result) return;
+      setIsScanning(true);
+      setScanError(null);
+      try {
+        const result = await scanEnvironmentForDIY(evt.target.result as string, concept, profile);
+        setAppState({ ...appState, diyExperiment: result });
+        onStart();
+      } catch {
+        setScanError('Yaar, photo clearly nahi aayo! Again try karo. 📷');
+        setIsScanning(false);
       }
     };
-  }, []);
+    reader.readAsDataURL(file);
+  };
+
 
   return (
     <div className="relative flex h-screen w-full flex-col bg-background-dark overflow-hidden">
+      {/* Camera feed */}
       <div className="absolute inset-0 z-0">
-        <video 
-          ref={videoRef} 
-          autoPlay 
-          playsInline 
-          className="h-full w-full object-cover opacity-80"
-        />
-        <div className="absolute bottom-[-50%] left-[-50%] right-[-50%] h-[200%] bg-[linear-gradient(to_right,rgba(244,140,37,0.2)_1px,transparent_1px),linear-gradient(to_bottom,rgba(244,140,37,0.2)_1px,transparent_1px)] bg-[length:40px_40px] [perspective:1000px] [transform:rotateX(60deg)] z-10"></div>
-        <div className="absolute top-[40%] w-full h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent z-20"></div>
-        
-        <div className="absolute top-[35%] left-[25%] z-30">
-          <div className="flex items-center gap-2 bg-primary px-3 py-1.5 rounded-full shadow-lg shadow-primary/40 border border-white/20">
-            <Sun className="text-white w-4 h-4" />
-            <span className="text-white text-xs font-bold uppercase tracking-wider">Lemon</span>
+        {hasCameraError ? (
+          <div className="h-full w-full bg-gradient-to-b from-deep-navy to-background-dark flex items-center justify-center">
+            <div className="text-center p-6">
+              <div className="text-6xl mb-4">🏠</div>
+              <p className="text-slate-400 text-sm">Gallery se apne kitchen ka photo upload karo!</p>
+            </div>
           </div>
-          <div className="w-0.5 h-12 bg-primary/60 mx-auto mt-0.5"></div>
-        </div>
-        
-        <div className="absolute top-[55%] right-[20%] z-30">
-          <div className="flex items-center gap-2 bg-primary px-3 py-1.5 rounded-full shadow-lg shadow-primary/40 border border-white/20">
-            <Beaker className="text-white w-4 h-4" />
-            <span className="text-white text-xs font-bold uppercase tracking-wider">Turmeric</span>
-          </div>
-          <div className="w-0.5 h-16 bg-primary/60 mx-auto mt-0.5"></div>
-        </div>
+        ) : (
+          <video ref={videoRef} autoPlay playsInline className="h-full w-full object-cover opacity-80" />
+        )}
+
+        {/* Scanning grid */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,107,53,0.1)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,107,53,0.1)_1px,transparent_1px)] bg-[length:40px_40px] opacity-50" />
+        <div className="absolute top-[40%] w-full h-0.5 bg-gradient-to-r from-transparent via-snap-orange/60 to-transparent z-20" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/60" />
       </div>
 
-      <div className="relative z-40 flex items-center bg-black/20 backdrop-blur-md p-4 pb-4 justify-between">
-        <button onClick={onBack} className="text-white flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10">
+      {/* Top nav */}
+      <div className="relative z-40 flex items-center bg-black/30 backdrop-blur-md p-4 pt-12 gap-4">
+        <button onClick={onBack} className="size-10 rounded-full bg-white/10 flex items-center justify-center text-white border border-white/10">
           <ArrowLeft className="w-6 h-6" />
         </button>
-        <div className="flex-1 px-4">
-          <h2 className="text-white text-base font-bold leading-tight tracking-tight">Apna kitchen / ghar dikhao mujhe! 👀</h2>
-          <p className="text-white/70 text-[10px] uppercase font-semibold tracking-widest">DIY MODE: SCANNING</p>
-        </div>
-        <div className="flex size-10 items-center justify-center rounded-full bg-white/10">
-          <HelpCircle className="text-white w-6 h-6" />
+        <div>
+          <h2 className="text-white text-base font-bold">Apni ki/ghar dikhao! 👀</h2>
+          <p className="text-snap-orange text-[10px] uppercase font-semibold tracking-widest">
+            Concept: {concept}
+          </p>
         </div>
       </div>
 
-      <div className="flex-1"></div>
+      <div className="flex-1" />
 
-      <div className="relative z-50 flex flex-col justify-end items-stretch">
-        <div className="flex flex-col items-stretch bg-background-dark rounded-t-lg shadow-2xl border-t border-primary/20">
-          <div className="flex h-6 w-full items-center justify-center">
-            <div className="h-1.5 w-12 rounded-full bg-primary/30"></div>
-          </div>
-          <div className="px-6 py-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-slate-100 text-xl font-bold leading-tight tracking-tight">Detected Items</h3>
-              <span className="bg-primary/20 text-primary text-xs font-bold px-2 py-1 rounded">2 FOUND</span>
-            </div>
-            
-            <div className="flex gap-3 flex-wrap mb-8">
-              <div className="flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-full bg-primary/20 border border-primary/40 pl-3 pr-5">
-                <Sparkles className="text-primary w-5 h-5" />
-                <p className="text-slate-100 text-sm font-semibold">Lemon</p>
-              </div>
-              <div className="flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-full bg-primary/20 border border-primary/40 pl-3 pr-5">
-                <Sparkles className="text-primary w-5 h-5" />
-                <p className="text-slate-100 text-sm font-semibold">Turmeric</p>
-              </div>
-              <div className="flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white/5 border border-white/10 border-dashed pl-3 pr-5 opacity-50">
-                <PlusCircle className="text-white/40 w-5 h-5" />
-                <p className="text-white/40 text-sm font-semibold">Add More</p>
-              </div>
-            </div>
+      {/* Bottom sheet */}
+      <div className="relative z-50 bg-background-dark rounded-t-3xl border-t border-snap-orange/20 shadow-2xl">
+        <div className="flex justify-center pt-3 pb-2">
+          <div className="h-1 w-10 rounded-full bg-white/20" />
+        </div>
+        <div className="p-6">
+          <h3 className="text-xl font-display font-bold text-white mb-2">
+            Scan Your Kitchen 🔍
+          </h3>
+          <p className="text-slate-400 text-sm mb-5">
+            Camera se apna ghar/kitchen dikhao — AI available items dhundh ke safe experiment design karega!
+          </p>
 
-            <button 
-              onClick={onStart}
-              className="w-full bg-primary hover:bg-primary/90 text-white flex items-center justify-center gap-3 h-16 rounded-xl shadow-xl shadow-primary/20 transition-all active:scale-95 mb-4"
+          {scanError && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+              {scanError}
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="size-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 shrink-0"
             >
-              <span className="text-lg font-bold">Experiment Shuru Karo! 🔥</span>
+              <Camera className="w-6 h-6" />
             </button>
-            <p className="text-center text-slate-400 text-xs mb-4">Move your phone to find more ingredients</p>
+
+            <button
+              onClick={captureAndScan}
+              disabled={isScanning}
+              className="flex-1 flex items-center justify-center gap-3 py-4 bg-snap-orange text-white font-display font-bold text-base rounded-2xl shadow-xl shadow-snap-orange/20 disabled:opacity-60 transition-opacity"
+            >
+              {isScanning ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  AI Scan Ho Raha Hai...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-5 h-5" />
+                  Scan & Design Experiment!
+                </>
+              )}
+            </button>
           </div>
+
+          <p className="text-center text-slate-500 text-xs mt-3">
+            AI will find materials and design a safe experiment!
+          </p>
         </div>
       </div>
 
-      <div className="relative z-50 h-20 bg-background-dark flex items-center justify-around px-8 border-t border-white/5">
-        <div className="flex flex-col items-center gap-1 opacity-50">
-          <Home className="w-6 h-6 text-slate-100" />
-          <span className="text-[10px] text-slate-100 font-medium">Home</span>
-        </div>
-        <div className="flex flex-col items-center gap-1">
-          <div className="bg-primary/20 p-2 rounded-lg">
-            <Microscope className="w-6 h-6 text-primary fill-current" />
-          </div>
-          <span className="text-[10px] text-primary font-bold">DIY Lab</span>
-        </div>
-        <div className="flex flex-col items-center gap-1 opacity-50">
-          <Trophy className="w-6 h-6 text-slate-100" />
-          <span className="text-[10px] text-slate-100 font-medium">Quests</span>
-        </div>
-        <div className="flex flex-col items-center gap-1 opacity-50">
-          <User className="w-6 h-6 text-slate-100" />
-          <span className="text-[10px] text-slate-100 font-medium">Profile</span>
-        </div>
-      </div>
+      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileInput} className="hidden" />
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }

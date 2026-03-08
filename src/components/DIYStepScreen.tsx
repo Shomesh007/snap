@@ -1,126 +1,187 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { X, Flashlight, CheckCircle2, Image as ImageIcon, Camera, RefreshCw, Droplet } from 'lucide-react';
+import { X, CheckCircle2, Camera, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { AppState } from '../store/appStore';
 
 interface Props {
   onBack: () => void;
   onComplete: () => void;
+  appState: AppState;
+  setAppState: (s: AppState) => void;
 }
 
-export default function DIYStepScreen({ onBack, onComplete }: Props) {
+export default function DIYStepScreen({ onBack, onComplete, appState, setAppState }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [currentStepIdx, setCurrentStepIdx] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+  const [showFriendMsg, setShowFriendMsg] = useState(false);
+
+  const experiment = appState.diyExperiment;
 
   useEffect(() => {
+    let s: MediaStream | null = null;
     async function startCamera() {
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') return;
       try {
-        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        setStream(s);
-        if (videoRef.current) {
-          videoRef.current.srcObject = s;
-        }
-      } catch (err) {
-        console.error("Error accessing camera:", err);
-      }
+        s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+        if (videoRef.current) videoRef.current.srcObject = s;
+      } catch { }
     }
     startCamera();
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
+    return () => { s?.getTracks().forEach(t => t.stop()); };
   }, []);
+
+  const currentStep = experiment?.steps[currentStepIdx];
+  const totalSteps = experiment?.steps.length || 4;
+
+  const handleStepComplete = () => {
+    const newCompleted = new Set(completedSteps);
+    newCompleted.add(currentStepIdx);
+    setCompletedSteps(newCompleted);
+    setShowFriendMsg(true);
+
+    // Speak friend comment
+    if (currentStep?.friendComment) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(currentStep.friendComment);
+      utterance.lang = 'hi-IN';
+      window.speechSynthesis.speak(utterance);
+    }
+
+    setTimeout(() => {
+      setShowFriendMsg(false);
+      if (currentStepIdx < totalSteps - 1) {
+        setCurrentStepIdx(prev => prev + 1);
+      } else {
+        // All steps done — update appState with XP + experiments count
+        const newState = {
+          ...appState,
+          xp: appState.xp + (experiment?.xpEarned ?? 150),
+          experimentsCount: appState.experimentsCount + 1,
+        };
+        setAppState(newState);
+        onComplete();
+      }
+    }, 1800);
+  };
+
+  // Fallback if no experiment loaded
+  if (!experiment) {
+    return (
+      <div className="h-screen bg-deep-navy flex flex-col items-center justify-center p-8 text-center">
+        <div className="text-5xl mb-4">🧪</div>
+        <h2 className="font-display text-2xl font-bold text-white mb-3">Experiment Load Ho Raha Hai...</h2>
+        <p className="text-slate-400 mb-6">Please wait ya pehle wapas jaake scan karo!</p>
+        <button onClick={onBack} className="px-6 py-3 bg-primary text-deep-navy rounded-2xl font-bold">
+          Wapas Jao
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex h-screen w-full flex-col overflow-hidden bg-background-dark">
-      <div className="relative h-[45%] w-full bg-slate-800">
-        <video 
-          ref={videoRef} 
-          autoPlay 
-          playsInline 
-          className="h-full w-full object-cover opacity-80"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-background-dark/40 via-transparent to-background-dark/60"></div>
-        
-        <div className="absolute top-0 left-0 w-full p-4 flex items-center justify-between">
-          <button onClick={onBack} className="flex size-10 items-center justify-center rounded-full bg-background-dark/40 backdrop-blur-md">
-            <X className="text-white w-6 h-6" />
+      {/* Camera feed (top portion) */}
+      <div className="relative h-[40%] w-full bg-slate-900">
+        <video ref={videoRef} autoPlay playsInline className="h-full w-full object-cover opacity-70" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background-dark/50 via-transparent to-background-dark/60" />
+
+        {/* Corner brackets */}
+        <div className="absolute inset-[15%] border border-dashed border-snap-orange/40 rounded-xl" />
+
+        {/* Top bar */}
+        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
+          <button onClick={onBack} className="size-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center">
+            <X className="text-white w-5 h-5" />
           </button>
-          <div className="px-4 py-1.5 rounded-full bg-background-dark/40 backdrop-blur-md border border-white/10">
-            <span className="text-white text-sm font-bold tracking-tight">Turmeric pH Test</span>
+          <div className="px-4 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10">
+            <span className="text-white text-sm font-bold">{experiment.experimentTitle}</span>
           </div>
-          <button className="flex size-10 items-center justify-center rounded-full bg-background-dark/40 backdrop-blur-md">
-            <Flashlight className="text-white w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-snap-orange/20 border border-snap-orange/30">
+            <span className="text-snap-orange font-bold text-xs">+{experiment.xpEarned} XP</span>
+          </div>
         </div>
 
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-64 h-64 border-2 border-primary/50 rounded-lg relative">
-            <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg"></div>
-            <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg"></div>
-            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg"></div>
-            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg"></div>
-            <div className="absolute top-1/2 left-0 w-full h-0.5 bg-primary/40 shadow-[0_0_15px_rgba(244,140,37,0.8)]"></div>
-          </div>
-        </div>
+        {/* Friend message overlay */}
+        <AnimatePresence>
+          {showFriendMsg && currentStep?.friendComment && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="absolute bottom-4 left-4 right-4 bg-primary/90 backdrop-blur-md rounded-2xl p-4 border border-primary/20"
+            >
+              <p className="text-deep-navy font-bold text-base text-center">{currentStep.friendComment}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <div className="relative h-[55%] w-full bg-background-dark rounded-t-lg shadow-2xl flex flex-col">
-        <div className="flex flex-col items-center pt-2 pb-4">
-          <div className="h-1.5 w-12 rounded-full bg-slate-700 mb-6"></div>
-          <div className="flex gap-2">
-            <div className="h-2 w-2 rounded-full bg-primary"></div>
-            <div className="h-2 w-8 rounded-full bg-primary"></div>
-            <div className="h-2 w-2 rounded-full bg-slate-700"></div>
-            <div className="h-2 w-2 rounded-full bg-slate-700"></div>
-            <div className="h-2 w-2 rounded-full bg-slate-700"></div>
-          </div>
+      {/* Steps content */}
+      <div className="flex-1 bg-background-dark overflow-y-auto flex flex-col">
+        {/* Progress dots */}
+        <div className="flex items-center justify-center gap-2 py-4">
+          {experiment.steps.map((_, i) => (
+            <div
+              key={i}
+              className={`rounded-full transition-all ${i === currentStepIdx ? 'w-8 h-2 bg-snap-orange' :
+                  completedSteps.has(i) ? 'w-2 h-2 bg-primary' :
+                    'w-2 h-2 bg-white/20'
+                }`}
+            />
+          ))}
         </div>
 
-        <div className="flex-1 px-6 flex flex-col items-center text-center">
-          <div className="inline-flex items-center px-4 py-1 rounded-full bg-primary/20 text-primary font-bold text-xs uppercase tracking-widest mb-4">
-            Step 2 of 5
+        <div className="px-6 flex flex-col flex-1">
+          {/* Step badge */}
+          <div className="inline-flex self-center items-center gap-2 px-4 py-1.5 rounded-full bg-snap-orange/20 border border-snap-orange/30 mb-4">
+            <span className="text-snap-orange font-bold text-sm">Step {currentStepIdx + 1} / {totalSteps}</span>
           </div>
-          <h1 className="text-2xl font-bold leading-tight mb-6">
-            Ab <span className="text-primary">turmeric</span> paani mein milao! 🥣
-          </h1>
 
-          <div className="w-full flex justify-center py-4">
-            <div className="relative w-40 h-40 flex items-center justify-center">
-              <div className="absolute inset-0 bg-primary/5 rounded-full"></div>
-              <div className="relative z-10 flex flex-col items-center">
-                <Droplet className="w-16 h-16 text-primary animate-bounce" />
-                <div className="mt-2 w-20 h-4 bg-slate-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary w-2/3"></div>
-                </div>
+          {/* Instruction */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStepIdx}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="flex flex-col items-center text-center gap-4 flex-1"
+            >
+              <h1 className="font-display text-xl font-bold text-white leading-snug">
+                {currentStep?.instruction}
+              </h1>
+
+              {/* Expected observation hint */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 w-full text-left">
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Expected Result:</p>
+                <p className="text-slate-200 text-sm">{currentStep?.expectedObservation}</p>
               </div>
-            </div>
-          </div>
-          <p className="text-slate-400 text-sm italic mt-2">
-            Mix well until the water turns yellow
-          </p>
+
+              {/* Camera action prompt */}
+              <div className="w-full flex items-center gap-3 bg-snap-orange/10 border border-snap-orange/20 rounded-2xl p-3">
+                <Camera className="text-snap-orange w-5 h-5 shrink-0" />
+                <p className="text-snap-orange text-sm font-medium">
+                  {currentStep?.cameraAction === 'verify_color_change' && 'Camera mein dekho — color change observe karo!'}
+                  {currentStep?.cameraAction === 'verify_color' && 'Color note karo — AI verify karega!'}
+                  {currentStep?.cameraAction === 'verify_no_change' && 'Kya badla? Camera mein dekho!'}
+                  {!currentStep?.cameraAction && 'Dhyan se observe karo!'}
+                </p>
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
-        <div className="p-6">
-          <button 
-            onClick={onComplete}
-            className="w-full flex items-center justify-center gap-3 bg-emerald-500 hover:bg-emerald-600 text-white h-16 rounded-xl font-bold text-lg shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+        {/* Complete step button */}
+        <div className="p-6 flex-shrink-0">
+          <button
+            onClick={handleStepComplete}
+            disabled={showFriendMsg}
+            className="w-full flex items-center justify-center gap-3 bg-snap-orange text-white h-16 rounded-2xl font-display font-bold text-lg shadow-[0_4px_0_#C47B32] active:translate-y-1 active:shadow-none transition-all disabled:opacity-60"
           >
-            <CheckCircle2 className="w-6 h-6 font-bold" />
-            SAHI!! Next step →
+            <CheckCircle2 className="w-6 h-6" />
+            {currentStepIdx < totalSteps - 1 ? 'Sahi! Agla Step →' : 'Experiment Complete!! 🎉'}
           </button>
         </div>
-      </div>
-
-      <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-4 z-50">
-        <button className="size-12 rounded-full bg-background-dark/60 backdrop-blur-xl border border-white/20 flex items-center justify-center text-white">
-          <ImageIcon className="w-6 h-6" />
-        </button>
-        <button className="size-16 rounded-full bg-white flex items-center justify-center text-background-dark shadow-xl ring-4 ring-primary/30">
-          <Camera className="w-8 h-8 font-bold" />
-        </button>
-        <button className="size-12 rounded-full bg-background-dark/60 backdrop-blur-xl border border-white/20 flex items-center justify-center text-white">
-          <RefreshCw className="w-6 h-6" />
-        </button>
       </div>
     </div>
   );

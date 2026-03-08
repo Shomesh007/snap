@@ -37,7 +37,7 @@ export default function SubjectSelectScreen({ onNext, profile, setProfile }: Pro
         </div>
       </header>
 
-      <main className="flex-1 px-8 pt-6 pb-24 overflow-y-auto no-scrollbar">
+      <main className="flex-1 px-8 pt-6 pb-24 overflow-y-auto">
         <div className="space-y-2 mb-8">
           <h1 className="font-display text-3xl font-extrabold tracking-tight leading-tight">
             Kaun sa subject mushkil lagta hai? 🤔

@@ -1,0 +1,27 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[functions]
+  # Use ES module bundling for the AWS SDK
+  node_bundler = "esbuild"
+
+# Rewrite /api/* → /.netlify/functions/* so frontend can call /api/bedrock etc.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA fallback — all other routes serve index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Ensure camera and microphone are never blocked by default browser policies
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Permissions-Policy = "camera=*, microphone=*"
+    Feature-Policy = "camera 'self'; microphone 'self'"

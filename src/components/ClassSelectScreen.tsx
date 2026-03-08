@@ -29,7 +29,7 @@ export default function ClassSelectScreen({ onNext, profile, setProfile }: Props
         </p>
       </header>
 
-      <main className="flex-grow px-8 pb-32 overflow-y-auto no-scrollbar">
+      <main className="flex-grow px-8 pb-32 overflow-y-auto">
         <div className="grid grid-cols-2 gap-4">
           {classes.map((cls) => (
             <button

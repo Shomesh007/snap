@@ -11,14 +11,8 @@ interface Props {
 export default function WelcomeScreen({ onNext, profile, setProfile }: Props) {
   return (
     <div className="flex flex-col h-full">
-      <div className="h-[40vh] relative w-full overflow-hidden">
-        <img 
-          className="w-full h-full object-cover" 
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUk-D1PmxVfB4lizQ8m1dH8uA5JRuAmBq6gqk4LaTkTtZg0AH3CLHaRCzfvY9gia00rWi1ZfP0VOjWh4Itb-SkaJwqa_a7wIS08OdpDHX_SBFRxVvgjOu74xCCEGK30gAFgear_THmGpMV4F1FD5vkLjh-m-CzOSgwNBA_BQWioe7GP58Z-jIGJhdngQR9XF4cIMGnN0MIBgAw4QHYgQcvc2egHthqAj9CJ2HVkziE_5wpYZi4ySTJcTKavx-1MzmnE9htptyCeK_U" 
-          alt="Welcome"
-          referrerPolicy="no-referrer"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-orange-900/10 to-transparent"></div>
+      <div className="h-[40vh] relative w-full overflow-hidden bg-gradient-to-br from-orange-600 via-orange-900 to-background-dark">
+        <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-orange-900/20 to-transparent"></div>
       </div>
 
       <main className="flex-1 bg-background-dark rounded-t-[3rem] -mt-12 relative z-10 flex flex-col px-8 pt-10 pb-12 justify-between border-t border-slate-800 shadow-2xl">
